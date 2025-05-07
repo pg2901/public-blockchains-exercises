@@ -7,7 +7,7 @@ const { ethers } = require("ethers");
 console.log(ethers.version);
 
 // Todo: Update this contract address.
-const cAddress = "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9";
+const cAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 const cName = "Greeting";
 
 const getContract = async (
@@ -87,7 +87,7 @@ const rawTransactionBasic = async () => {
     console.log();
 
     // Fill in this value with the encoded signature of reset():
-    let encodedSignature = "ENCODED_SIGNATURE_HERE"; 
+    let encodedSignature = "d826f88f"; 
     let calldata = "0x" + encodedSignature;
 
     // Raw transaction.
@@ -124,10 +124,9 @@ const rawTransactionBasic = async () => {
 
 // Takes a function's signature as input and returns the Keccak256 hash.
 const doKeccak256 = (signature) => {
-
-    // Your code here.
-
-};
+  let hash = hre.ethers.id(signature)
+  return String(hash).substring(0, 10)
+}
 
 const rawTransactionDIY = async () => {
 
@@ -206,9 +205,12 @@ const rawTransactionDIY = async () => {
 // and return the first 4 bytes. Optionally, takes a verbose
 // parameter to print to console its operations.
 const encodeSignature = (signature, verbose) => {
-    
-    // Your code here.
-
+  if (verbose) console.log(`Input signature: ${signature}`)
+  let hash = hre.ethers.id(signature)
+  if (verbose) console.log(`Keccak256 hash of signature: ${hash}`)
+  result = String(hash).substring(0, 10)
+  if (verbose) console.log(`Extracting the first four bytes: ${result}`)
+  return result
 };
 
 const rawTransactionStaticParams = async () => {
@@ -236,7 +238,7 @@ const rawTransactionStaticParams = async () => {
 
     // Your code here (hint above).
 
-    // let calldata = ... ;
+    let calldata = hre.ethers.concat([encodedSignature, hre.ethers.zeroPadValue(hre.ethers.toBeArray(2), 32)])
 
     console.log();
     console.log("**Raw transaction**: chooseGreeting(uint8)");
@@ -312,14 +314,16 @@ const rawTransactionDynamicParams = async () => {
 
     let signature = "setGreeting(string)";
     // Hash the signature with Keccak256 and takes 4 bytes.
-    let calldata = encodeSignature(signature);
+    let encodedSignature = encodeSignature(signature);
     
     // Encode String parameter "Buongiorno", or get inspired here:
     // https://www.berlitz.com/blog/hello-different-languages
 
    
     // Your code here (hint above).
-    // let calldata = ... ;
+    let abiCoder = hre.ethers.AbiCoder.defaultAbiCoder()
+    let paramsData = abiCoder.encode(["string"], ["Buongiorno"])
+    let calldata = hre.ethers.concat([encodedSignature, paramsData])
 
     console.log();
     console.log("**Raw transaction**: setGreeting(string)");
