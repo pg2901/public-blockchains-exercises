@@ -43,8 +43,8 @@ const checkBalances = async() => {
     balanceEther = await provider.getBalance(receiverAddress);
     console.log(" Receiver Ether:", ethers.formatEther(balanceEther));
 
-    balanceEther = await provider.getBalance(receiver2Address);
-    console.log("Receiver2 Ether:", ethers.formatEther(balanceEther));
+    // balanceEther = await provider.getBalance(receiver2Address);
+    // console.log("Receiver2 Ether:", ethers.formatEther(balanceEther));
 
     balanceEther = await provider.getBalance(testAddress);
     console.log("     Test Ether:", ethers.formatEther(balanceEther));
@@ -86,7 +86,11 @@ const send = async(to, amount = 1, data) => {
     console.log('***Before:');
     await checkBalances();
 
-    // Your code here.
+    const tx = await signer.sendTransaction({
+      to: to,
+      value: ethers.parseEther('' + amount), 
+      data: data
+    })
 
     await waitForTx(tx);
 
@@ -108,18 +112,38 @@ const send = async(to, amount = 1, data) => {
 // console.log('Sending to Receiver: no msg.data');
 
 // Your code here.
+// send(receiverAddress)
 
 // b2.
 // console.log('Sending to Receiver: msg.data not empty');
-
-// Your code here.
+encodedSignature = "0xd826f88f"
+// send(receiverAddress, 1, encodedSignature)
 
 // b3.
 // console.log('Sending to Receiver: using payable function');
 
-// Your code here.
+const donateEther = async(address = receiverAddress, 
+  cName = "Receiver", amount = 1) => {
 
-// Exercise 1. Sending Ether through the Sender contract.
+console.log('***Before:');
+await checkBalances();
+
+const c = await getContract(signer, cName, address);
+
+let tx = await c.donateEther({
+value: ethers.parseEther('' + amount)
+});
+
+await waitForTx(tx);
+
+console.log('***After:');
+await checkBalances();
+};
+
+// donateEther();
+
+
+// Exercise 2. Sending Ether through the Sender contract.
 /////////////////////////////////////////////////////////
 
 // Complete the missing methods in the _Sender_ contract to send Ether 
@@ -173,28 +197,6 @@ const sendWithSender = async(method, to, amount = 1) => {
 // sendWithSender("send", receiverAddress);
 
 // sendWithSender("call", receiverAddress);
-
-// console.log('Sending to Receiver: using payable function');
-
-const donateEther = async(address = receiverAddress, 
-                          cName = "Receiver", amount = 1) => {
-
-    console.log('***Before:');
-    await checkBalances();
-
-    const c = await getContract(signer, cName, address);
-
-    let tx = await c.donateEther({
-        value: ethers.parseEther('' + amount)
-    });
-
-    await waitForTx(tx);
-
-    console.log('***After:');
-    await checkBalances();
-};
-
-// donateEther();
 
 
 // Helper functions.

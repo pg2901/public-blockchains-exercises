@@ -11,7 +11,8 @@ contract Sender {
         console.log('***Transfer');
         console.log(msg.value);
         
-        // Your code here!    
+        // Your code here!
+        _to.transfer(msg.value);    
     }
 
     // Send returns a boolean value indicating success or failure.
@@ -20,7 +21,9 @@ contract Sender {
         console.log('***Send');
         console.log(msg.value);
 
-        // Your code here!    
+        // Your code here!
+        bool sent = _to.send(msg.value);
+        console.log(sent);    
     }
 
     // Call returns a boolean value indicating success or failure.
@@ -30,6 +33,8 @@ contract Sender {
         console.log(msg.value);
 
         // Your code here!
+        (bool sent, ) = _to.call{value: msg.value}('');
+        console.log(sent);
     }
    
     // Receives ether.
