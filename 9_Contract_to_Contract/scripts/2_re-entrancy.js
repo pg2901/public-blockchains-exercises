@@ -80,11 +80,14 @@ const attack = async(amount = 10) => {
         value: ethers.parseEther('' + amount)
     });
 
+    await waitForTx(tx);
+
     console.log('***Before:');
     await checkBalances();
 
     const a = await getContract(attacker, "Attacker", attackerAddress);
 
+    // keeps reverting, says it fails to send ether from attacker to attacker contract!! (fixed: needed to add a balance check in attacker contract)
     tx = await a.attack({
         value: ethers.parseEther('1')
     });
@@ -129,7 +132,7 @@ const attackGuard = async(amount = 10) => {
     await checkBalances();
 };
 
-// attackGuard();
+attackGuard();
 
 // Helper function.
 
