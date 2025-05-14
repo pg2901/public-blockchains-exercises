@@ -97,14 +97,14 @@ const guess = async(num = 100) => {
     // Operation 2: execute a function.
 
     // A) Direct execution.
-    let res = await proxyContract.guessNumber(num);
+    // let res = await proxyContract.guessNumber(num);
     // B) Static call.
     // TODO: update this code.
-    // let res = ... 
+    let res = await proxyContract.guessNumber.staticCall(num);
 
     // The logic below does not work for A) because res is a transaction,  
     // it expects a boolean.
-    // console.log(res);
+    console.log(res);
     res = res ? ' ' : ' not ';
     console.log('  ***The guess ' + num + ' was' + res + 'correct.');
     
@@ -143,7 +143,8 @@ const upgrade = async(address) => {
     const proxyContract = await getContract(signer, "Proxy", proxyAddress);
 
     // TODO: upgrade the contract.
-    // Your code here.
+    let tx = await proxyContract.upgrade(address)
+    waitForTx(tx)
 
     console.log('***Upgraded to: ', address);
 };
@@ -174,7 +175,7 @@ const upgradeAndGuess = async(address) => {
 // variables are declared in the Solidity file. Then check what happens when
 // you execute the guess method...
 
-// upgradeAndGuess(v3Address);
+upgradeAndGuess(v3Address);
 // or:
 // checkGuesses();
 

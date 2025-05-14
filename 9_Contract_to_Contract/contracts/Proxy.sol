@@ -37,7 +37,7 @@ contract Proxy {
         // returns a boolean
 
         // Your code here (replace the line below).
-        bool correct = true;
+        bool correct = abi.decode(data, (bool));
 
         console.log("Result:", correct);
         return correct;
