@@ -13,7 +13,7 @@ module.exports = buildModule("AMMYModule", (m) => {
   const registryLocal = addresses["AMMRegistryModule#AMMRegistry"]
   const registry = "0xa269147eD50Eb19038d88981Fbe408ac39954FBA"
 
-  const con = m.contract('AMM', [name, symbol, tokenAddressLocal, validatorLocal, registryLocal])
+  const con = m.contract('AMM', [name, symbol, tokenAddress, registry, validator])
 
   return { con }
 })
