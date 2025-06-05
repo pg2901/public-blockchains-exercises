@@ -49,101 +49,253 @@ contract AMM is ERC20, BaseAssignment {
 
   function donateEther() external payable {}
 
-  function addLiquidity(uint256 _tokenAmount) public payable returns (uint256) {
-    // Given amount of Ether deposited, compute the amount of X to be transferred and execute it (approve)
-    uint256 computedTokenAmount;
-    if (msg.value == 0) {
-      computedTokenAmount = _tokenAmount;
-    } else if (tokenPool == 0) {
-      computedTokenAmount = msg.value;
-    } else {
-      computedTokenAmount = (msg.value * tokenPool)/(address(this).balance - msg.value);
-    }
+  // function addLiquidity(uint256 _tokenAmount) public payable returns (uint256) {
+  //   // Solution from Exercise
+  //   uint256 liquidityTokens;
+  //   uint256 ethBalance = address(this).balance;
+  //   uint256 tokenAmount;
+    
+  //   if(tokenPool == 0) {
+  //     liquidityTokens = ethBalance;
+  //     tokenAmount = _tokenAmount;
+  //   } else {
+  //     uint256 ethReserve = ethBalance - msg.value;
+  //     tokenAmount = (msg.value * tokenPool) / ethReserve;
+  //     require(_tokenAmount >= tokenAmount, "insufficient token amount");
+  //     liquidityTokens = (this.totalSupply() * msg.value) / ethReserve;
+  //   }
 
-    // console.log("Computed tokens from ETH sent is %o", computedTokenAmount);  
-
-    // if computed X tokens is higher than tokenAmount, revert transaction
-    require(computedTokenAmount <= _tokenAmount, "computed tokens higher than declared tokens");
-    // calculate liquidity (share of pool for tokens and ETH sent)
-    uint256 lpSupply = ERC20.totalSupply();
-    // console.log("Current LP Token Supply is %o", lpSupply);
-    uint256 lpTokenAmount;
-    if (lpSupply == 0) {
-      lpTokenAmount = computedTokenAmount;
-    } else {
-      lpTokenAmount = (computedTokenAmount * lpSupply)/tokenPool;
-    }
-
-    // console.log("Computed LP tokens from Liquidity Provided is %o", lpTokenAmount);
-
-    // check if we have the allowance to call transferFrom
-    require(tokenContract.allowance(msg.sender, address(this)) >= computedTokenAmount, "Provider needs to allow the AMM to transfer tokens first");
-    tokenContract.transferFrom(msg.sender, address(this), computedTokenAmount);
-    tokenPool += computedTokenAmount;
-
-    // mint LP tokens
-    ERC20._mint(msg.sender, lpTokenAmount);
   
-    // emitting event
-    emit LiquidityAdded(msg.sender, msg.value, computedTokenAmount);
+    function addLiquidity(uint256 _tokenAmount)
+        public
+        payable
+        returns (uint256)
+    {
+        uint256 liquidity;
+        uint256 ethBalance = address(this).balance;
+        uint256 tokenReserve = getReserve();
 
-    // returns number of LP tokens as uint256 value
-    return lpTokenAmount;
-  }
 
-  function removeLiquidity(uint256 _lpAmount) public returns (uint256, uint256) {
-    require(this.totalSupply() > 0, "No liquidity provided");
-    require(this.balanceOf(msg.sender) >= _lpAmount, "Too high LP amount requested");
+        if (tokenReserve == 0) {
+            liquidity = ethBalance;
+            tokenContract.transferFrom(msg.sender, address(this), _tokenAmount);
+            _mint(msg.sender, liquidity);
+        } else {
+            // Eth in contract before this transfer.
+            uint256 ethReserve = ethBalance - msg.value;
 
-    uint256 computedTokenAmount = (_lpAmount * tokenPool)/this.totalSupply();
-    uint256 computedETH = (_lpAmount * address(this).balance)/this.totalSupply();
+            // Calculate how much tokens need to be added to the pool.
+            // The ratio token/eth must be the same.
+            // Whatever ETH we transfer we need to add the same amount
+            // times the ratio. 
 
-    ERC20._burn(msg.sender, _lpAmount);
-    (bool sent, ) = payable(msg.sender).call{value: computedETH}("");
-    require(sent, "ETH transfer failed");
-    tokenContract.transfer(msg.sender, computedTokenAmount);
-    tokenPool -= computedTokenAmount;
+            // Doing the division first results in loss of precision, because
+            // numbers are truncated to integers.
+            // uint256 tokenAmount =  msg.value * (tokenReserve / ethReserve);
+            // Forcing multiplication first.
+            uint256 tokenAmount =  (msg.value * tokenReserve) / ethReserve;
 
-    emit LiquidityRemoved(msg.sender, computedETH, computedTokenAmount);
+            // _tokenAmount is a show-stopper, the max we would transfer.
+            require(_tokenAmount >= tokenAmount, "insufficient token amount");
 
-    return (computedETH, computedTokenAmount);
-  }
+            // Calculate the liquidity:
+            // If you add X% of the total ETH reserve, you will get X% of the
+            // the current total supply of LPs.
+            // liquidity = totalSupply() * (msg.value / ethReserve);
+            liquidity = (totalSupply() * msg.value) / ethReserve;
 
-  function getTokenAmount(uint256 _ethSold) public view returns (uint256) {
-    require(tokenPool > 0, "No tokens available to buy");
-    uint256 ethSoldAfterFee = _ethSold * 99; //charging 1% fee and keeping the remains
-    uint256 newETHbalance = (address(this).balance*100) + ethSoldAfterFee;
-    uint256 amt = (tokenPool * ethSoldAfterFee)/newETHbalance; 
-    return amt;
-  }
+            // Transfer the tokens to the exchange
+            tokenContract.transferFrom(msg.sender, address(this), tokenAmount);
+            _mint(msg.sender, liquidity);
+        }
 
-  function getEthAmount(uint256 _tokenSold) public view returns (uint256) {
-    require(address(this).balance > 0, "No ETH to buy");
-    uint256 tokenSoldAfterFee = _tokenSold * 99; //charging 1% fee and keeping the remains
-    uint256 newTokenPool = (tokenPool*100) + _tokenSold;
-    uint256 amt = (address(this).balance * tokenSoldAfterFee)/newTokenPool;
-    return amt;
-  }
+        emit LiquidityAdded(msg.sender, msg.value, _tokenAmount);
 
-  function ethToToken(uint256 _minTokens) public payable {
-    uint256 tokensToSell = this.getTokenAmount(msg.value);
-    require(tokensToSell > _minTokens, "Received Token value too low");
+        return liquidity;
+    }
 
-    tokenContract.transfer(msg.sender, tokensToSell);
 
-    emit TokenBought(msg.sender, msg.value, tokensToSell);
-  }
+  //   tokenContract.transferFrom(msg.sender, address(this), tokenAmount);
+  //   _mint(msg.sender, liquidityTokens);
+  //   tokenPool += tokenAmount;
 
-  function tokenToEth(uint256 _tokensSold, uint256 _minEth) public {
-    uint256 ethToSell = this.getEthAmount(_tokensSold);
-    require(ethToSell > _minEth, "Received ETH value too low");
+  //   // emitting event
+  //   emit LiquidityAdded(msg.sender, msg.value, tokenAmount);
 
-    tokenContract.transferFrom(msg.sender, address(this), _tokensSold);
-    (bool sent, ) = msg.sender.call{value: ethToSell}("");
-    require(sent, "Sending ETH failed");
+  //   // returns number of LP tokens as uint256 value
+  //   return liquidityTokens;
+  // }
 
-    emit EthBought(msg.sender, ethToSell, _tokensSold);
-  }
+  // function removeLiquidity(uint256 _lpAmount) public returns (uint256, uint256) {
+  //   require(this.totalSupply() > 0, "No liquidity provided");
+  //   require(this.balanceOf(msg.sender) >= _lpAmount, "Too high LP amount requested");
+
+  //   uint256 computedTokenAmount = (_lpAmount * tokenPool)/this.totalSupply();
+  //   uint256 computedETH = (_lpAmount * address(this).balance)/this.totalSupply();
+
+  //   ERC20._burn(msg.sender, _lpAmount);
+  //   (bool sent, ) = payable(msg.sender).call{value: computedETH}("");
+  //   require(sent, "ETH transfer failed");
+  //   tokenContract.transfer(msg.sender, computedTokenAmount);
+  //   tokenPool -= computedTokenAmount;
+
+  //   emit LiquidityRemoved(msg.sender, computedETH, computedTokenAmount);
+
+  //   return (computedETH, computedTokenAmount);
+  // }
+
+
+
+      function removeLiquidity(uint256 _amount)
+        public
+        payable
+        returns (uint256, uint256)
+    {
+        require(_amount > 0, "invalid amount");
+
+        uint256 ethReserve = address(this).balance;
+
+        require(ethReserve > 0, "Eth amount is 0");
+
+        // Compute the share of ETH and token reserves corresponding to
+        // a given amount of LP tokens.
+        uint256 supply = totalSupply();
+
+        // Doing the division first results in loss of precision, because
+        // numbers are truncated to integers. However, it's clearer to
+        // visualize it in this way.
+        // uint256 ethAmount = ethReserve * (_amount / supply);
+        // uint256 tokenAmount = getReserve() * (_amount / supply);
+        // Enforcing multiplication first:
+        uint256 ethAmount = (ethReserve * _amount) / supply;
+        uint256 tokenAmount = (getReserve() * _amount) / supply;
+
+
+        // Burn the liquidity tokens
+        _burn(msg.sender, _amount);
+
+        // Transfer the ETH and tokens to the user
+        payable(msg.sender).transfer(ethAmount);
+
+        // Transfer the tokens to the user
+        // IERC20(tokenAddress).approve(msg.sender, tokenAmount);
+        tokenContract.transfer(msg.sender, tokenAmount);
+
+        emit LiquidityRemoved(msg.sender, ethAmount, tokenAmount);
+
+        return (ethAmount, tokenAmount);
+    }
+
+    function getReserve() public view returns (uint256) {
+        return tokenContract.balanceOf(address(this));
+    }
+
+    function getTokenAmount(uint256 _ethSold) public view returns (uint256) {
+        require(_ethSold > 0, "ethSold cannot be zero");
+        uint256 tokenReserve = getReserve();
+        return getAmount(_ethSold, address(this).balance, tokenReserve);
+    }
+
+    function getAmount(
+        uint256 inputAmount,
+        uint256 inputReserve,
+        uint256 outputReserve
+    ) private pure returns (uint256) {
+        require(inputReserve > 0 && outputReserve > 0, "invalid reserves");
+
+        // Take 1% fee.
+        uint256 inputAmountWithFee = inputAmount * 99;
+        uint256 numerator = inputAmountWithFee * outputReserve;
+        uint256 denominator = (inputReserve * 100) + inputAmountWithFee;
+
+        // return (inputAmount * outputReserve) / (inputReserve + inputAmount);
+        return numerator / denominator;
+    }
+
+    function getEthAmount(uint256 _tokenSold) public view returns (uint256) {
+        require(_tokenSold > 0, "tokenSold cannot be zero");
+        uint256 tokenReserve = getReserve();
+        return getAmount(_tokenSold, tokenReserve, address(this).balance);
+    }
+
+    function ethToTokenTransfer(uint256 _minTokens, address recipient)
+        public
+        payable
+    {
+        uint256 tokenReserve = getReserve();
+        uint256 tokensBought = getAmount(
+            msg.value,
+            address(this).balance - msg.value,
+            tokenReserve
+        );
+
+        require(tokensBought >= _minTokens, "insufficient output amount");
+
+        tokenContract.transfer(recipient, tokensBought);
+
+        emit TokenBought(msg.sender, msg.value, tokensBought);
+    }
+
+    function ethToToken(uint256 _minTokens) public payable {
+        ethToTokenTransfer(_minTokens, msg.sender);
+    }
+
+    function tokenToEth(uint256 _tokensSold, uint256 _minEth) public {
+        uint256 tokenReserve = getReserve();
+        
+        uint256 ethBought = getAmount(
+            _tokensSold,
+            address(this).balance,
+            tokenReserve
+        );
+
+        require(ethBought >= _minEth, "insufficient output amount");
+
+        tokenContract.transferFrom(
+            msg.sender,
+            address(this),
+            _tokensSold
+        );
+        payable(msg.sender).transfer(ethBought);
+
+        emit EthBought(msg.sender, ethBought, _tokensSold);
+    }
+
+  // function getTokenAmount(uint256 _ethSold) public view returns (uint256) {
+  //   require(tokenPool > 0, "No tokens available to buy");
+  //   uint256 ethSoldAfterFee = _ethSold * 99; //charging 1% fee and keeping the remains
+  //   uint256 newETHbalance = (address(this).balance*100) + ethSoldAfterFee;
+  //   uint256 amt = (tokenPool * ethSoldAfterFee)/newETHbalance; 
+  //   return amt;
+  // }
+
+  // function getEthAmount(uint256 _tokenSold) public view returns (uint256) {
+  //   require(address(this).balance > 0, "No ETH to buy");
+  //   uint256 tokenSoldAfterFee = _tokenSold * 99; //charging 1% fee and keeping the remains
+  //   uint256 newTokenPool = (tokenPool*100) + _tokenSold;
+  //   uint256 amt = (address(this).balance * tokenSoldAfterFee)/newTokenPool;
+  //   return amt;
+  // }
+
+  // function ethToToken(uint256 _minTokens) public payable {
+  //   uint256 tokensToSell = this.getTokenAmount(msg.value);
+  //   require(tokensToSell > _minTokens, "Received Token value too low");
+
+  //   tokenContract.transfer(msg.sender, tokensToSell);
+
+  //   emit TokenBought(msg.sender, msg.value, tokensToSell);
+  // }
+
+  // function tokenToEth(uint256 _tokensSold, uint256 _minEth) public {
+  //   uint256 ethToSell = this.getEthAmount(_tokensSold);
+  //   require(ethToSell > _minEth, "Received ETH value too low");
+
+  //   tokenContract.transferFrom(msg.sender, address(this), _tokensSold);
+  //   (bool sent, ) = msg.sender.call{value: ethToSell}("");
+  //   require(sent, "Sending ETH failed");
+
+  //   emit EthBought(msg.sender, ethToSell, _tokensSold);
+  // }
 
   function tokenToTokenSwap(uint256 _tokensSold, uint256 _minTokensBought, address _tokenAddress) public payable {
     address amm = registry.getExchange(_tokenAddress);
